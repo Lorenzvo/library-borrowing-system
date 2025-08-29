@@ -1,6 +1,11 @@
+@app.route("/api/health")
+def health():
+    """Health check endpoint."""
+    return jsonify({"status": "ok"}), 200
 """
 Users Service: Flask app for user management with SQLite (users.db).
 """
+
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 
@@ -9,6 +14,12 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
+
+# Health endpoint
+@app.route("/api/health")
+def health():
+    """Health check endpoint."""
+    return jsonify({"status": "ok"}), 200
 
 class User(db.Model):
     """User model."""
@@ -57,18 +68,56 @@ def about():
         '''
         return html, 200
 
+
 @app.route("/api/users", methods=["POST"])
 def create_user():
-    """Create a new user."""
+    """Create a new user with validation."""
     data = request.get_json()
-    if not data or not data.get("name") or not data.get("email"):
-        return jsonify({"error": "Missing name or email."}), 400
-    if User.query.filter_by(email=data["email"]).first():
+    name = (data or {}).get("name", "").strip()
+    email = (data or {}).get("email", "").strip()
+    if not name or not email:
+        return jsonify({"error": "Name and email are required."}), 400
+    if User.query.filter_by(email=email).first():
         return jsonify({"error": "Email already exists."}), 409
-    user = User(name=data["name"], email=data["email"])
+    user = User(name=name, email=email)
     db.session.add(user)
     db.session.commit()
     return jsonify(user.to_dict()), 201
+@app.route("/docs")
+def docs():
+        """Users API documentation page."""
+        html = '''
+        <h1>Users API Docs</h1>
+        <nav><a href="/">Home</a> | <a href="/about">About</a> | <a href="/docs">Docs</a> | <a href="/api/health">Health</a></nav>
+        <hr>
+        <h2>Endpoints</h2>
+        <table border="1" cellpadding="6">
+            <tr><th>Method</th><th>Path</th><th>Notes</th></tr>
+            <tr><td>POST</td><td>/api/users</td><td>Create user (name, email)</td></tr>
+            <tr><td>GET</td><td>/api/users</td><td>List all users</td></tr>
+            <tr><td>GET</td><td>/api/users/&lt;id&gt;</td><td>Get user by ID</td></tr>
+            <tr><td>GET</td><td>/api/health</td><td>Health check</td></tr>
+        </table>
+        <hr>
+        <h2>Examples</h2>
+        <details><summary>POST /api/users</summary><pre><code>curl -X POST http://localhost:5001/api/users -H "Content-Type: application/json" -d '{"name": "Alice", "email": "alice@example.com"}'
+        </code></pre></details>
+        <details><summary>GET /api/users</summary><pre><code>curl http://localhost:5001/api/users
+        </code></pre></details>
+        <details><summary>GET /api/users/&lt;id&gt;</summary><pre><code>curl http://localhost:5001/api/users/1
+        </code></pre></details>
+        <details><summary>Health check</summary><pre><code>curl http://localhost:5001/api/health
+        </code></pre></details>
+        <hr>
+        <h2>Error Cases</h2>
+        <table border="1" cellpadding="6">
+            <tr><th>Status</th><th>When</th><th>Payload</th></tr>
+            <tr><td>400</td><td>Missing/empty name or email</td><td>{"error": "Name and email are required."}</td></tr>
+            <tr><td>409</td><td>Duplicate email</td><td>{"error": "Email already exists."}</td></tr>
+            <tr><td>404</td><td>User not found</td><td>{"error": "User not found."}</td></tr>
+        </table>
+        '''
+        return html, 200
 
 @app.route("/api/users", methods=["GET"])
 def get_users():

@@ -1,16 +1,15 @@
-"""
-Books Service: Flask app for book and loan management with SQLite (books.db).
-"""
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
+import time
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///books.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
 db = SQLAlchemy(app)
+
+rate_limit = {}
 
 class Book(db.Model):
     """Book model."""
@@ -18,7 +17,6 @@ class Book(db.Model):
     title = db.Column(db.String(120), nullable=False)
     author = db.Column(db.String(80), nullable=False, default="Unknown")
     status = db.Column(db.String(16), nullable=False, default="AVAILABLE")
-
     def to_dict(self) -> dict:
         return {"id": self.id, "title": self.title, "author": self.author, "status": self.status}
 
@@ -29,44 +27,52 @@ class Loan(db.Model):
     book_id = db.Column(db.Integer, nullable=False)
     borrowed_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     returned_at = db.Column(db.DateTime, nullable=True)
-
+    due_date = db.Column(db.DateTime, nullable=True)
     def to_dict(self) -> dict:
-        return {"id": self.id, "user_id": self.user_id, "book_id": self.book_id, "borrowed_at": self.borrowed_at, "returned_at": self.returned_at}
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "book_id": self.book_id,
+            "borrowed_at": self.borrowed_at,
+            "returned_at": self.returned_at,
+            "due_date": self.due_date
+        }
 
 @app.route("/")
 def home():
-    """Pleasant semantic HTML home page."""
     html = '''
     <h1>Books Service</h1>
-    <p>Microservice for managing books and loans.</p>
-    <nav>
-      <a href="/">Home</a> |
-      <a href="/about">About</a> |
-      <a href="/api/books">API: Books</a>
-    </nav>
+    <nav><a href="/">Home</a> | <a href="/about">About</a> | <a href="/docs">Docs</a></nav>
+    <hr>
+    <h2>Endpoints</h2>
     <table border="1" cellpadding="6">
       <tr><th>Method</th><th>Path</th><th>Description</th></tr>
       <tr><td>POST</td><td>/api/books</td><td>Create a new book</td></tr>
       <tr><td>GET</td><td>/api/books</td><td>List all books</td></tr>
+      <tr><td>GET</td><td>/api/books/available</td><td>List available books</td></tr>
       <tr><td>POST</td><td>/api/borrow</td><td>Borrow a book</td></tr>
       <tr><td>POST</td><td>/api/return</td><td>Return a book</td></tr>
       <tr><td>GET</td><td>/api/loans</td><td>List all loans</td></tr>
+      <tr><td>GET</td><td>/api/overdue</td><td>List overdue loans</td></tr>
     </table>
-    <details><summary>Sample: User validation</summary><pre><code>GET http://localhost:5001/api/users/&lt;id&gt;
-    </code></pre></details>
     '''
+
     return html, 200
+
+if __name__ == "__main__":
+    with app.app_context():
+        db.create_all()
+    app.run(port=5002)
 
 @app.route("/about")
 def about():
-    """Simple HTML about page."""
     html = '''
     <h1>About Books Service</h1>
     <p>This service manages books and loans in its own SQLite database.</p>
     <table border="1" cellpadding="6">
       <tr><th>Database File</th><th>Table</th><th>Columns</th></tr>
       <tr><td>books.db</td><td>Book</td><td>id (PK), title (TEXT), author (TEXT), status (TEXT)</td></tr>
-      <tr><td>books.db</td><td>Loan</td><td>id (PK), user_id (INT), book_id (INT), borrowed_at (DATETIME), returned_at (DATETIME)</td></tr>
+      <tr><td>books.db</td><td>Loan</td><td>id (PK), user_id (INT), book_id (INT), borrowed_at (DATETIME), returned_at (DATETIME), due_date (DATETIME)</td></tr>
     </table>
     <ul>
       <li>Books are AVAILABLE or BORROWED</li>
@@ -78,7 +84,6 @@ def about():
 
 @app.route("/api/books", methods=["POST"])
 def create_book():
-    """Create a new book."""
     data = request.get_json()
     title = data.get("title")
     author = data.get("author", "Unknown")
@@ -91,19 +96,31 @@ def create_book():
 
 @app.route("/api/books", methods=["GET"])
 def get_books():
-    """Get all books."""
     books = Book.query.all()
+    return jsonify([b.to_dict() for b in books]), 200
+
+@app.route("/api/books/available", methods=["GET"])
+def get_available_books():
+    books = Book.query.filter_by(status="AVAILABLE").all()
     return jsonify([b.to_dict() for b in books]), 200
 
 @app.route("/api/borrow", methods=["POST"])
 def borrow_book():
-    """Borrow a book."""
+    ip = request.remote_addr
+    now = time.time()
+    attempts = rate_limit.get(ip, [])
+    attempts = [t for t in attempts if now - t < 60]
+    if len(attempts) >= 5:
+        return jsonify({"error": "rate limit exceeded"}), 429
+    attempts.append(now)
+    rate_limit[ip] = attempts
+
     data = request.get_json()
     user_id = data.get("user_id")
     book_id = data.get("book_id")
+    days = data.get("days")
     if not user_id or not book_id:
         return jsonify({"error": "Missing user_id or book_id."}), 400
-    # Validate user via Users Service
     user_resp = requests.get(f"http://localhost:5001/api/users/{user_id}")
     if user_resp.status_code == 404:
         return jsonify({"error": "User not found."}), 404
@@ -115,7 +132,10 @@ def borrow_book():
     open_loan = Loan.query.filter_by(book_id=book_id, returned_at=None).first()
     if open_loan:
         return jsonify({"error": "Book already on loan."}), 409
-    loan = Loan(user_id=user_id, book_id=book_id)
+    due_date = None
+    if isinstance(days, int) and days > 0:
+        due_date = datetime.utcnow() + timedelta(days=days)
+    loan = Loan(user_id=user_id, book_id=book_id, due_date=due_date)
     book.status = "BORROWED"
     db.session.add(loan)
     db.session.commit()
@@ -123,7 +143,6 @@ def borrow_book():
 
 @app.route("/api/return", methods=["POST"])
 def return_book():
-    """Return a book."""
     data = request.get_json()
     book_id = data.get("book_id")
     if not book_id:
@@ -143,9 +162,68 @@ def return_book():
 
 @app.route("/api/loans", methods=["GET"])
 def get_loans():
-    """Get all loans."""
-    loans = Loan.query.all()
+    user_id = request.args.get("user_id", type=int)
+    open_filter = request.args.get("open")
+    query = Loan.query
+    if user_id:
+        query = query.filter_by(user_id=user_id)
+    if open_filter is not None:
+        if open_filter.lower() == "true":
+            query = query.filter_by(returned_at=None)
+        elif open_filter.lower() == "false":
+            query = query.filter(Loan.returned_at.isnot(None))
+    loans = query.all()
     return jsonify([l.to_dict() for l in loans]), 200
+
+@app.route("/api/overdue", methods=["GET"])
+def get_overdue():
+    now = datetime.utcnow()
+    overdue_loans = Loan.query.filter(
+        Loan.returned_at.is_(None),
+        Loan.due_date.isnot(None),
+        Loan.due_date < now
+    ).all()
+    return jsonify([l.to_dict() for l in overdue_loans]), 200
+
+@app.route("/docs")
+def docs():
+        html = '''
+        <h1>Books API Docs</h1>
+        <nav><a href="/">Home</a> | <a href="/about">About</a> | <a href="/docs">Docs</a></nav>
+        <hr>
+        <h2>Endpoints</h2>
+        <table border="1" cellpadding="6">
+            <tr><th>Method</th><th>Path</th><th>Notes</th></tr>
+            <tr><td>POST</td><td>/api/books</td><td>Create book (title, author)</td></tr>
+            <tr><td>GET</td><td>/api/books</td><td>List all books</td></tr>
+            <tr><td>GET</td><td>/api/books/available</td><td>List available books</td></tr>
+            <tr><td>POST</td><td>/api/borrow</td><td>Borrow a book (optional "days" param sets due_date)</td></tr>
+            <tr><td>POST</td><td>/api/return</td><td>Return a book</td></tr>
+            <tr><td>GET</td><td>/api/loans</td><td>List loans (filters: user_id, open)</td></tr>
+            <tr><td>GET</td><td>/api/overdue</td><td>List overdue loans</td></tr>
+        </table>
+        <hr>
+        <h2>Examples</h2>
+        <details><summary>POST /api/borrow</summary><pre><code>curl -X POST http://localhost:5002/api/borrow -H "Content-Type: application/json" -d '{"user_id": 1, "book_id": 1, "days": 3}'
+        </code></pre></details>
+        <details><summary>Borrow with due date</summary><pre><code>curl -X POST http://localhost:5002/api/borrow -H "Content-Type: application/json" -d '{"user_id": 1, "book_id": 1, "days": 3}'
+        </code></pre></details>
+        <details><summary>Overdue loans</summary><pre><code>curl http://localhost:5002/api/overdue
+        </code></pre></details>
+        <details><summary>Rate limit example</summary><pre><code>429 {"error": "rate limit exceeded"}
+        </code></pre></details>
+        <hr>
+        <h2>Rules & Notes</h2>
+        <table border="1" cellpadding="6">
+            <tr><th>Rule</th></tr>
+            <tr><td>Must validate user via Users API before borrowing</td></tr>
+            <tr><td>Conflicts return 409</td></tr>
+            <tr><td>Borrow accepts optional "days" param for due_date</td></tr>
+            <tr><td>More than 5 borrow attempts per minute per IP returns 429</td></tr>
+            <tr><td>/api/overdue returns open loans past due_date</td></tr>
+        </table>
+        '''
+        return html, 200
 
 if __name__ == "__main__":
     with app.app_context():
