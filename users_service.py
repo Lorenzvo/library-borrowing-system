@@ -1,7 +1,11 @@
-@app.route("/api/health")
-def health():
-    """Health check endpoint."""
-    return jsonify({"status": "ok"}), 200
+
+from flask import Flask, request, jsonify
+from flask_sqlalchemy import SQLAlchemy
+
+app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
 """
 Users Service: Flask app for user management with SQLite (users.db).
 """
@@ -14,6 +18,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
+
 
 # Health endpoint
 @app.route("/api/health")
@@ -52,7 +57,7 @@ def home():
             <tr><td>GET</td><td>/api/users</td><td>List all users</td></tr>
             <tr><td>GET</td><td>/api/users/&lt;id&gt;</td><td>Get user by ID</td></tr>
         </table>
-        <details><summary>Sample cURL</summary><pre><code>curl -X POST http://localhost:5001/api/users -H "Content-Type: application/json" -d '{"name": "Alice", "email": "alice@example.com"}'
+    <details><summary>Sample cURL</summary><pre><code>curl -X POST http://localhost:5001/api/users -H "Content-Type: application/json" -d '{{"name": "Alice", "email": "alice@example.com"}}'
         </code></pre></details>
         '''
         return html, 200
@@ -111,7 +116,7 @@ def docs():
         </table>
         <hr>
         <h2>Examples</h2>
-        <details><summary>POST /api/users</summary><pre><code>curl -X POST http://localhost:5001/api/users -H "Content-Type: application/json" -d '{"name": "Alice", "email": "alice@example.com"}'
+    <details><summary>POST /api/users</summary><pre><code>curl -X POST http://localhost:5001/api/users -H "Content-Type: application/json" -d '{{"name": "Alice", "email": "alice@example.com"}}'
         </code></pre></details>
         <details><summary>GET /api/users</summary><pre><code>curl http://localhost:5001/api/users
         </code></pre></details>

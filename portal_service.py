@@ -3,9 +3,9 @@ import requests
 
 app = Flask(__name__)
 USERS_API = "http://localhost:5001"
-BOOKS_API = "http://localhost:5002"
+BOOKS_API = "http://localhost:5050"
 
-FOOTER = '<hr><p><small>No JS/CSS. Server-rendered HTML only. Data via Users(5001) & Books(5002).</small></p>'
+FOOTER = '<hr><p><small>No JS/CSS. Server-rendered HTML only. Data via Users(5001) & Books(5050).</small></p>'
 
 NAV = (
     '<nav>'

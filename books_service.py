@@ -65,12 +65,6 @@ def home():
     '''
     return html, 200
 
-if __name__ == "__main__":
-    with app.app_context():
-        db.create_all()
-    app.run(port=5002)
-
-
 @app.route("/about")
 def about():
     nav = (
@@ -103,7 +97,9 @@ def create_book():
 
 @app.route("/api/books", methods=["GET"])
 def get_books():
+    print("GET /api/books called")
     books = Book.query.all()
+    print("Books query done")
     return jsonify([b.to_dict() for b in books]), 200
 
 @app.route("/api/books/available", methods=["GET"])
@@ -169,6 +165,7 @@ def return_book():
 
 @app.route("/api/loans", methods=["GET"])
 def get_loans():
+    print("GET /api/loans called")
     user_id = request.args.get("user_id", type=int)
     open_filter = request.args.get("open")
     query = Loan.query
@@ -179,7 +176,9 @@ def get_loans():
             query = query.filter_by(returned_at=None)
         elif open_filter.lower() == "false":
             query = query.filter(Loan.returned_at.isnot(None))
+    print("About to query DB for loans")
     loans = query.all()
+    print("Loans query done")
     return jsonify([l.to_dict() for l in loans]), 200
 
 @app.route("/api/overdue", methods=["GET"])
@@ -211,11 +210,11 @@ def docs():
         </table>
         <hr>
         <h2>Examples</h2>
-        <details><summary>POST /api/borrow</summary><pre><code>curl -X POST http://localhost:5002/api/borrow -H "Content-Type: application/json" -d '{"user_id": 1, "book_id": 1, "days": 3}'
+    <details><summary>POST /api/borrow</summary><pre><code>curl -X POST http://localhost:5050/api/borrow -H "Content-Type: application/json" -d '{"user_id": 1, "book_id": 1, "days": 3}'
         </code></pre></details>
-        <details><summary>Borrow with due date</summary><pre><code>curl -X POST http://localhost:5002/api/borrow -H "Content-Type: application/json" -d '{"user_id": 1, "book_id": 1, "days": 3}'
+    <details><summary>Borrow with due date</summary><pre><code>curl -X POST http://localhost:5050/api/borrow -H "Content-Type: application/json" -d '{"user_id": 1, "book_id": 1, "days": 3}'
         </code></pre></details>
-        <details><summary>Overdue loans</summary><pre><code>curl http://localhost:5002/api/overdue
+    <details><summary>Overdue loans</summary><pre><code>curl http://localhost:5050/api/overdue
         </code></pre></details>
         <details><summary>Rate limit example</summary><pre><code>429 {"error": "rate limit exceeded"}
         </code></pre></details>
@@ -235,4 +234,4 @@ def docs():
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
-    app.run(port=5002)
+    app.run(port=5050)
