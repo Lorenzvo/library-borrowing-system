@@ -15,6 +15,7 @@ NAV = (
     '<a href="/borrow">Borrow</a> | '
     '<a href="/return">Return</a> | '
     '<a href="/loans">Loans</a> | '
+    '<a href="/admin">Admin</a> | '
     '<a href="/about">About</a>'
     '</nav><hr>'
 )
@@ -225,6 +226,76 @@ def loans():
     {overdue_table if overdue_table else ''}
     {table}
     {'<p><strong>Error:</strong> ' + error + '</p>' if error else ''}
+    {FOOTER}'''
+    return render_template_string(html)
+
+@app.route("/admin", methods=["GET", "POST"])
+def admin():
+    """Admin page for updating books and deleting books/users."""
+    message = request.args.get("message")
+    error = request.args.get("error")
+    if request.method == "POST":
+        action = request.form.get("action")
+        try:
+            if action == "update_book":
+                book_id = request.form.get("book_id", "").strip()
+                title = request.form.get("title", "").strip()
+                author = request.form.get("author", "").strip()
+                payload = {}
+                if title:
+                    payload["title"] = title
+                if author:
+                    payload["author"] = author
+                if not payload:
+                    return redirect(url_for("admin", error="No fields to update"))
+                resp = requests.patch(f"{BOOKS_API}/api/books/{book_id}", json=payload, timeout=3)
+                if resp.status_code == 200:
+                    return redirect(url_for("admin", message="Book updated"))
+                else:
+                    err = resp.json().get("error", "Update failed")
+                    return redirect(url_for("admin", error=err))
+            elif action == "delete_book":
+                book_id = request.form.get("book_id_del", "").strip()
+                resp = requests.delete(f"{BOOKS_API}/api/books/{book_id}", timeout=3)
+                if resp.status_code == 200:
+                    return redirect(url_for("admin", message="Book deleted"))
+                else:
+                    err = resp.json().get("error", "Delete failed")
+                    return redirect(url_for("admin", error=err))
+            elif action == "delete_user":
+                user_id = request.form.get("user_id_del", "").strip()
+                resp = requests.delete(f"{USERS_API}/api/users/{user_id}", timeout=3)
+                if resp.status_code == 200:
+                    return redirect(url_for("admin", message="User deleted"))
+                else:
+                    err = resp.json().get("error", "Delete failed")
+                    return redirect(url_for("admin", error=err))
+        except Exception:
+            return redirect(url_for("admin", error="Error contacting service"))
+    update_form = '''<fieldset><legend>Update Book</legend>
+    <form method="post" action="/admin">
+      <input type="hidden" name="action" value="update_book">
+      Book ID: <input name="book_id" required> New Title: <input name="title"> New Author: <input name="author">
+      <button type="submit">Update</button>
+    </form></fieldset>'''
+    del_book_form = '''<fieldset><legend>Delete Book</legend>
+    <form method="post" action="/admin">
+      <input type="hidden" name="action" value="delete_book">
+      Book ID: <input name="book_id_del" required>
+      <button type="submit">Delete Book</button>
+    </form></fieldset>'''
+    del_user_form = '''<fieldset><legend>Delete User</legend>
+    <form method="post" action="/admin">
+      <input type="hidden" name="action" value="delete_user">
+      User ID: <input name="user_id_del" required>
+      <button type="submit">Delete User</button>
+    </form></fieldset>'''
+    html = f'''<h1>Admin</h1>{NAV}
+    {'<p><strong>Message:</strong> ' + message + '</p>' if message else ''}
+    {'<p><strong>Error:</strong> ' + error + '</p>' if error else ''}
+    {update_form}
+    {del_book_form}
+    {del_user_form}
     {FOOTER}'''
     return render_template_string(html)
 

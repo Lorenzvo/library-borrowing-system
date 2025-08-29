@@ -102,6 +102,36 @@ def get_books():
     print("Books query done")
     return jsonify([b.to_dict() for b in books]), 200
 
+@app.route("/api/books/<int:book_id>", methods=["PATCH", "PUT"])
+def update_book(book_id: int):
+    """Update a book's title and/or author."""
+    data = request.get_json() or {}
+    book = Book.query.get(book_id)
+    if not book:
+        return jsonify({"error": "Book not found."}), 404
+    title = data.get("title")
+    author = data.get("author")
+    if title is None and author is None:
+        return jsonify({"error": "No fields provided."}), 400
+    if isinstance(title, str) and title.strip():
+        book.title = title.strip()
+    if isinstance(author, str) and author.strip():
+        book.author = author.strip()
+    db.session.commit()
+    return jsonify(book.to_dict()), 200
+
+@app.route("/api/books/<int:book_id>", methods=["DELETE"])
+def delete_book(book_id: int):
+    """Delete a book if it is not currently borrowed."""
+    book = Book.query.get(book_id)
+    if not book:
+        return jsonify({"error": "Book not found."}), 404
+    if book.status == "BORROWED":
+        return jsonify({"error": "Cannot delete a borrowed book."}), 409
+    db.session.delete(book)
+    db.session.commit()
+    return jsonify({"message": "Book deleted."}), 200
+
 @app.route("/api/books/available", methods=["GET"])
 def get_available_books():
     books = Book.query.filter_by(status="AVAILABLE").all()
