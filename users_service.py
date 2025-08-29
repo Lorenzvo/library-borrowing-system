@@ -1,6 +1,7 @@
 
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
+import re
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
@@ -93,6 +94,9 @@ def create_user():
     email = (data or {}).get("email", "").strip()
     if not name or not email:
         return jsonify({"error": "Name and email are required."}), 400
+    # Strict email pattern: characters (no spaces/@), then @, then domain (no spaces/@), dot, then exactly 3 letters.
+    if not re.match(r'^[^@\s]+@[^@\s]+\.[A-Za-z]{3}$', email):
+        return jsonify({"error": "Invalid email format (expected name@domain.tld with 3-letter TLD)."}), 400
     if User.query.filter_by(email=email).first():
         return jsonify({"error": "Email already exists."}), 409
     user = User(name=name, email=email)

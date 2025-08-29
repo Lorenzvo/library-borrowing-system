@@ -71,11 +71,17 @@ def users():
     for u in users_list:
         table += f'<tr><td>{u["id"]}</td><td>{u["name"]}</td><td>{u["email"]}</td></tr>'
     table += '</table>'
-    form = '''<fieldset><legend>Create User</legend>
-    <form method="post" action="/users">
-      Name: <input name="name" required> Email: <input name="email" required>
-      <button type="submit">Create</button>
-    </form></fieldset>'''
+    form = (
+        '<fieldset><legend>Create User</legend>'
+        '<form method="post" action="/users">'
+        '  Name: <input name="name" required> '
+        'Email: <input name="email" type="email" required pattern="^[^@\\s]+@[^@\\s]+\\.[A-Za-z]{3}$"'
+        ' title="Format: name@domain.tld (3-letter TLD e.g. com, org, net)"> '
+        '<button type="submit">Create</button>'
+        '</form>'
+        '<p><small>Email must match name@domain.tld where tld is exactly 3 letters (e.g. user@example.com).</small></p>'
+        '</fieldset>'
+    )
     html = f'''<h1>Users</h1>{NAV}
     {table}
     {'<p><strong>Error:</strong> ' + error + '</p>' if error else ''}
