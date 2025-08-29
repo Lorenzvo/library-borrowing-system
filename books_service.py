@@ -38,25 +38,31 @@ class Loan(db.Model):
             "due_date": self.due_date
         }
 
+
 @app.route("/")
 def home():
-    html = '''
+    nav = (
+        '<nav>'
+        '<a href="http://localhost:5000/">Portal Home</a> | '
+        '<a href="http://localhost:5000/borrow">Portal Borrow</a> | '
+        '<a href="http://localhost:5000/return">Portal Return</a> | '
+        '<a href="http://localhost:5000/loans">Portal Loans</a>'
+        '</nav><hr>'
+    )
+    html = f'''
     <h1>Books Service</h1>
-    <nav><a href="/">Home</a> | <a href="/about">About</a> | <a href="/docs">Docs</a></nav>
-    <hr>
-    <h2>Endpoints</h2>
+    {nav}
+    <p>This service manages books and loans for the library system.</p>
     <table border="1" cellpadding="6">
-      <tr><th>Method</th><th>Path</th><th>Description</th></tr>
-      <tr><td>POST</td><td>/api/books</td><td>Create a new book</td></tr>
-      <tr><td>GET</td><td>/api/books</td><td>List all books</td></tr>
-      <tr><td>GET</td><td>/api/books/available</td><td>List available books</td></tr>
-      <tr><td>POST</td><td>/api/borrow</td><td>Borrow a book</td></tr>
-      <tr><td>POST</td><td>/api/return</td><td>Return a book</td></tr>
-      <tr><td>GET</td><td>/api/loans</td><td>List all loans</td></tr>
-      <tr><td>GET</td><td>/api/overdue</td><td>List overdue loans</td></tr>
+        <tr><th>Endpoint</th><th>Method</th><th>Notes</th></tr>
+        <tr><td>/api/books</td><td>GET, POST</td><td>List or add books</td></tr>
+        <tr><td>/api/borrow</td><td>POST</td><td>Borrow a book</td></tr>
+        <tr><td>/api/return</td><td>POST</td><td>Return a book</td></tr>
+        <tr><td>/api/loans</td><td>GET</td><td>List loans</td></tr>
+        <tr><td>/api/overdue</td><td>GET</td><td>List overdue loans</td></tr>
+        <tr><td>/docs</td><td>GET</td><td>API documentation</td></tr>
     </table>
     '''
-
     return html, 200
 
 if __name__ == "__main__":
@@ -64,21 +70,22 @@ if __name__ == "__main__":
         db.create_all()
     app.run(port=5002)
 
+
 @app.route("/about")
 def about():
-    html = '''
+    nav = (
+        '<nav>'
+        '<a href="http://localhost:5000/">Portal Home</a> | '
+        '<a href="http://localhost:5000/borrow">Portal Borrow</a> | '
+        '<a href="http://localhost:5000/return">Portal Return</a> | '
+        '<a href="http://localhost:5000/loans">Portal Loans</a>'
+        '</nav><hr>'
+    )
+    html = f'''
     <h1>About Books Service</h1>
-    <p>This service manages books and loans in its own SQLite database.</p>
-    <table border="1" cellpadding="6">
-      <tr><th>Database File</th><th>Table</th><th>Columns</th></tr>
-      <tr><td>books.db</td><td>Book</td><td>id (PK), title (TEXT), author (TEXT), status (TEXT)</td></tr>
-      <tr><td>books.db</td><td>Loan</td><td>id (PK), user_id (INT), book_id (INT), borrowed_at (DATETIME), returned_at (DATETIME), due_date (DATETIME)</td></tr>
-    </table>
-    <ul>
-      <li>Books are AVAILABLE or BORROWED</li>
-      <li>Only AVAILABLE books can be borrowed</li>
-      <li>Returning sets status to AVAILABLE</li>
-    </ul>
+    {nav}
+    <p>Independent microservice with its own SQLite database.</p>
+    <p>Handles book management and loans via API.</p>
     '''
     return html, 200
 

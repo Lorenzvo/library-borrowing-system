@@ -35,14 +35,17 @@ class User(db.Model):
 @app.route("/")
 def home():
         """Pleasant semantic HTML home page."""
-        html = '''
+        nav = (
+            '<nav>'
+            '<a href="http://localhost:5000/">Portal Home</a> | '
+            '<a href="http://localhost:5000/users">Portal Users</a> | '
+            '<a href="http://localhost:5000/books">Portal Books</a>'
+            '</nav><hr>'
+        )
+        html = f'''
         <h1>Users Service</h1>
+        {nav}
         <p>A minimal microservice for user management.</p>
-        <nav>
-            <a href="/">Home</a> |
-            <a href="/about">About</a> |
-            <a href="/api/users">API: Users</a>
-        </nav>
         <table border="1" cellpadding="6">
             <tr><th>Method</th><th>Path</th><th>Description</th></tr>
             <tr><td>POST</td><td>/api/users</td><td>Create a new user</td></tr>
@@ -58,8 +61,16 @@ def home():
 @app.route("/about")
 def about():
         """Simple HTML about page."""
-        html = '''
+        nav = (
+            '<nav>'
+            '<a href="http://localhost:5000/">Portal Home</a> | '
+            '<a href="http://localhost:5000/users">Portal Users</a> | '
+            '<a href="http://localhost:5000/books">Portal Books</a>'
+            '</nav><hr>'
+        )
+        html = f'''
         <h1>About Users Service</h1>
+        {nav}
         <p>This service manages users in its own SQLite database.</p>
         <table border="1" cellpadding="6">
             <tr><th>Database File</th><th>Table</th><th>Columns</th></tr>
